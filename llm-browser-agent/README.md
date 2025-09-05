@@ -180,5 +180,5 @@ uv run ../score.py \
   --column "Browser JS App GitHub Repo URL" \
   --repos ./results/ \
   --check evals.toml \
-  --score public-scores.csv
+  --score scores.csv
 ```

@@ -1,0 +1,179 @@
+instructions = """
+You are grading a student project that turns bulk text/markdown into a styled PowerPoint, per the assignment below. You will ONLY read the repository files provided (no web browsing, no external execution). Evaluate statically, cite concrete evidence (file paths, function/variable names, config keys, HTML attributes, JSON fields), and score each check independently. Output MUST be a single flat JSON object mapping check IDs to {score, max, reason}. Scores are real numbers in [0, max]. Be conservative: no evidence → low score. Prefer specific, falsifiable evidence over speculation.
+
+Assignment essentials to verify (functional):
+- Paste large text/markdown; optional one-line guidance.
+- User-supplied LLM API key (OpenAI/Anthropic/Gemini etc.); do NOT store/log.
+- Upload .pptx/.potx template or presentation; infer/copy style/colors/fonts/layouts; reuse template images; generate a new .pptx for download. No AI image generation.
+- Intelligent text→slides mapping; reasonable slide count.
+- Provider-agnostic LLM calls using user key.
+- Public GitHub with MIT license + README; hosted demo link; 200–300 word write-up explaining parsing→slides and template styling.
+
+Assignment optional extras (for bonus within the UX/extras bucket):
+- Speaker notes via LLM; tone modes; previews; guidance templates; robust error handling, upload limits, API retry logic.
+
+How to evaluate (static, evidence-based):
+1) Discover structure: look for package managers (package.json, requirements.txt, pyproject.toml), build/serve scripts, server vs client, and PPTX libraries (e.g., python-pptx, PptxGenJS). Note any provider SDKs or generic HTTP clients.
+2) Text input & mapping: locate parsing code (e.g., Markdown parser, heading detection, chunking heuristics). Evidence: functions like split_into_slides(), markdownToBlocks(), outline builders, regexes, token/length heuristics.
+3) Template/style reuse: locate code that opens/reads the uploaded .pptx/.potx and extracts theme (slide masters, layouts, color scheme, fonts) and reuses images from the template. Evidence: references to slide_masters, theme color maps, copying media/relationships, layout IDs, placeholder binding.
+4) LLM abstraction & key handling: verify that provider is selectable, keys come from user input or env UI (not hard-coded), and keys are not logged/stored. Evidence: forms (name attributes), headers redaction, log filtering, .env.sample, privacy notes.
+5) PPTX generation & download: confirm creation and download of a .pptx file (correct MIME type and file extension). Evidence: Presentation().save(), PptxGenJS.writeFile(), HTTP response headers (Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation), client-side blob downloads.
+6) “No AI images” rule: check for image-generation endpoints (DALL·E, Images API, Stability, Midjourney bots) and ensure none are called in generation path.
+7) Deliverables: MIT license file, README with setup/usage, hosted demo URL (treat an obvious placeholder as present but note limitation), and a 200–300 word write-up explaining parsing→slides and styling.
+
+Code quality/UX:
+- Clarity, structure, minimal deps, good docs; security/privacy (do-not-log keys), error handling with user-visible messages; tests/CI if present; config/env hygiene; accessible, responsive UI with progress/error states; performance for large text.
+
+Scoring & output:
+- Each check has a max; totals sum to 1.0 weight. Score 0..max. Give short, evidence-based “reason” citing files/symbols (e.g., "src/app.tsx:handleUpload", "server/routes/generate.js: line 42", "templates/theme.xml").
+- If a requirement is implemented partially, award proportional credit and say exactly what’s missing.
+- If repo is missing critical areas (e.g., no PPTX generation), set those checks to ~0 with reason.
+- Output ONLY JSON (no prose) with the schema:
+  {
+    "<check_id>": {"score": <number>, "max": <number>, "reason": "<short evidence-based justification>"}, ...
+  }
+"""
+
+# =========================
+# Functional (sum = 0.50)
+# =========================
+
+[checks.text_input_markdown_support]
+max = 0.05
+check = """
+Users can paste large text/markdown and optional one-line guidance; markdown parsing present or clearly handled. Evidence: textarea/input components, markdown parser import/usage, guidance field wired to pipeline.
+"""
+
+[checks.api_key_handling_security]
+max = 0.05
+check = """
+User-supplied LLM key accepted via UI; not stored or logged; redaction in logs; no hard-coded secrets. Evidence: form fields, headers handling, no console/server logs of keys, .env.sample, privacy notice.
+"""
+
+[checks.pptx_upload_and_parsing]
+max = 0.07
+check = """
+Accepts .pptx/.potx upload; reads template file structure. Evidence: file input accept='.pptx,.potx'; server/client code reading Presentation(); extraction of masters/layouts/media.
+"""
+
+[checks.style_inference_and_template_reuse]
+max = 0.08
+check = """
+Infers/copies template style (colors, fonts, layouts) and reuses images from the uploaded file. Evidence: theme/color map extraction, font mapping, layout/placeholder binding, media/relationship copy.
+"""
+
+[checks.slide_mapping_and_chunking_quality]
+max = 0.10
+check = """
+Intelligent text→slides mapping (headings, bullets, length heuristics); clean structure per slide. Evidence: outline/chunking functions, token/length limits, heading/bullet detection, sectioning logic.
+"""
+
+[checks.slide_count_reasonableness]
+max = 0.03
+check = """
+Slide count scales with input length and guidance; avoids fixed N. Evidence: dynamic calculation, thresholds, max/min caps with rationale.
+"""
+
+[checks.provider_agnostic_llm_support]
+max = 0.04
+check = """
+Provider-agnostic calls (OpenAI/Anthropic/Gemini etc.) via abstraction; model/key chosen per user input. Evidence: switch/strategy pattern, configurable endpoints, no provider lock-in.
+"""
+
+[checks.pptx_generation_and_download]
+max = 0.06
+check = """
+Generates a valid .pptx and enables download. Evidence: writeFile()/save(), correct MIME, download link/blob, server route returning .pptx.
+"""
+
+[checks.no_ai_image_generation]
+max = 0.02
+check = """
+No image-generation APIs used in slide content pipeline; only reuses template images. Evidence: absence of image-gen endpoints; comments/docs clarifying policy.
+"""
+
+# =========================
+# Code Quality & Clarity (sum = 0.33)
+# =========================
+
+[checks.code_readability_structure_docs]
+max = 0.06
+check = """
+Readable, modular code; clear naming; comments where needed; concise docs on architecture. Evidence: src/ layout, small functions, ARCHITECTURE.md/README sections.
+"""
+
+[checks.repo_structure_build_scripts]
+max = 0.05
+check = """
+Clean repo structure with build/dev scripts and reproducible setup. Evidence: package.json scripts / Makefile / requirements + lockfiles; clear run instructions.
+"""
+
+[checks.dependency_minimalism]
+max = 0.04
+check = """
+Minimal, well-chosen deps; avoids heavy/unnecessary libraries. Evidence: short deps list; rationale in README; no redundant SDKs.
+"""
+
+[checks.security_and_privacy_practices]
+max = 0.04
+check = """
+Security hygiene beyond keys: CORS, input validation, size limits, no sensitive logs. Evidence: middleware, validators, upload constraints, log redaction.
+"""
+
+[checks.error_handling_and_logging]
+max = 0.05
+check = """
+Robust try/catch paths; user-visible error messages; structured logs without secrets. Evidence: centralized error handlers, toast/alert components, logger config.
+"""
+
+[checks.tests_and_ci]
+max = 0.03
+check = """
+Presence of tests and/or CI. Evidence: tests/ folder, tooling config (vitest/jest/pytest), GitHub Actions.
+"""
+
+[checks.config_and_env_management]
+max = 0.03
+check = """
+Config via env with safe defaults; no secrets in repo; sample env provided. Evidence: .env.sample, config.ts, twelve-factor patterns.
+"""
+
+[checks.license_and_readme_completeness]
+max = 0.03
+check = """
+MIT LICENSE present; README with setup/usage; 200–300 word write-up on parsing→slides and styling. Evidence: LICENSE file; README sections; word count ~200–300.
+"""
+
+# =========================
+# UI/UX Polish & Extras (sum = 0.17)
+# =========================
+
+[checks.ui_clarity_accessibility]
+max = 0.05
+check = """
+Simple, clear form; labels/placeholders; a11y basics (aria labels, contrast, keyboard). Evidence: semantic HTML, aria- attributes, accessible components.
+"""
+
+[checks.user_feedback_progress_errors]
+max = 0.04
+check = """
+Progress indicators during processing; helpful validation/errors; guidance text. Evidence: spinners/progress, disabled states, inline error messages.
+"""
+
+[checks.responsiveness_performance]
+max = 0.03
+check = """
+Responsive layout; handles large text without freezing; chunked work or worker usage if applicable. Evidence: CSS responsiveness, async/streaming patterns, web worker usage.
+"""
+
+[checks.hosted_demo_presence]
+max = 0.02
+check = """
+Hosted demo link present in README. If unreachable (cannot verify), note as 'link present' but score modestly. Evidence: URL in README.
+"""
+
+[checks.optional_enhancements]
+max = 0.03
+check = """
+Any of: speaker notes via LLM; tone/stylistic modes; previews; guidance templates; upload limits + retry logic. Evidence: feature flags, UI toggles, retry/backoff code.
+"""
