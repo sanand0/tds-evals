@@ -31,15 +31,23 @@ def main(
     score: Path = typer.Option(Path("scores.csv"), help="Path to write scores CSV"),
 ) -> None:
     names = load_checks(check)
-    fieldnames = ["repo", *names]
+    fieldnames = ["repo", "total", *names]
     with score.open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()
         for path in sorted(repos.glob("*.json")):
             data = json.loads(path.read_text(encoding="utf-8"))
-            row = {"repo": path.stem}
+            owner, repo = path.stem.split(".", 1)
+            row = {"repo": f"https://github.com/{owner}/{repo}"}
+            total = 0.0
             for name in names:
-                row[name] = data.get(name, {}).get("score", "")
+                val = data.get(name, {}).get("score")
+                if isinstance(val, (int, float)):
+                    row[name] = val
+                    total += val
+                else:
+                    row[name] = ""
+            row["total"] = total
             w.writerow(row)
 
 

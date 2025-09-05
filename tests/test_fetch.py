@@ -28,6 +28,7 @@ def test_find_first_repo():
         ("https://github.com/owner/repo", ("owner", "repo")),
         ("Check https://github.com/owner/repo.git ", ("owner", "repo")),
         ("text https://github.com/o/r/path", ("o", "r")),
+        ("stuff https://github.com/x/y?ref=main", ("x", "y")),
         ("no url here", None),
     ]
     for text, expected in cases:

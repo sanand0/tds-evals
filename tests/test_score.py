@@ -36,5 +36,9 @@ def test_score_writes_csv(tmp_path):
     )
     assert result.exit_code == 0
     rows = list(csv.DictReader(csv_path.open()))
+    assert rows[0]["repo"] == "https://github.com/a/b"
+    assert rows[0]["total"] == "0.1"
     assert rows[0]["agent_loop"] == "0.1"
+    assert rows[1]["repo"] == "https://github.com/c/d"
+    assert rows[1]["total"] == "0.2"
     assert rows[1]["agent_loop"] == "0.2"

@@ -142,6 +142,8 @@ async def eval_all(
     results: Dict[str, Dict[str, Any]] = {}
     paths = sorted(repos_dir.glob("*.txt"))
     for txt_path in tqdm(paths, desc="Evaluating repos", unit="repo"):
+        if txt_path.with_suffix(".json").exists():
+            continue
         data = await eval_one(txt_path, api_key, system_prompt, checks, schema)
         if data:
             results[txt_path.stem] = data

@@ -64,3 +64,28 @@ def test_eval_writes_json(monkeypatch, tmp_path):
     assert seen["count"] == 1
     assert len(calls) == 2
     assert "LLM Agent POC" in calls[0]["system_prompt"]
+
+
+def test_eval_skips_existing_json(monkeypatch, tmp_path):
+    repo_dir = tmp_path / "code"
+    repo_dir.mkdir()
+    (repo_dir / "a.b.txt").write_text("repo", encoding="utf-8")
+    json_path = repo_dir / "a.b.json"
+    json_path.write_text("{\"existing\":true}", encoding="utf-8")
+
+    called = False
+
+    async def fake_call(**kwargs):
+        nonlocal called
+        called = True
+        return "{}"
+
+    monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
+
+    runner.invoke(
+        eval_mod.app,
+        ["--repos", str(repo_dir), "--check", "llm-browser-agent/evals.toml"],
+    )
+
+    assert json.loads(json_path.read_text(encoding="utf-8")) == {"existing": True}
+    assert not called

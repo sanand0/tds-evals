@@ -19,7 +19,7 @@ from tqdm import tqdm
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 GITHUB_REPO_RE = re.compile(
-    r"https?://(?:www\.)?github\.com/([^/\s]+)/([^/\s#?]+)(?:[/#?]\S*)?",
+    r"https?://(?:www\.)?github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)(?:[/#?]\S*)?",
     re.IGNORECASE,
 )
 
