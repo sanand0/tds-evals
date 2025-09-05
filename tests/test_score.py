@@ -59,3 +59,31 @@ def test_score_writes_status_and_rows(tmp_path):
     assert rows[1]["total"] == ""
     assert rows[2]["status"] == "invalid_repo_url"
     assert rows[2]["repo"] == ""
+
+
+def test_score_handles_invalid_json(tmp_path):
+    repo_dir = tmp_path / "code"
+    repo_dir.mkdir()
+    (repo_dir / "a.b.json").write_text("not json", encoding="utf-8")
+    submissions = tmp_path / "submissions.csv"
+    write_submissions(submissions)
+    out_csv = tmp_path / "scores.csv"
+    runner.invoke(
+        score_mod.app,
+        [
+            "--submissions",
+            str(submissions),
+            "--column",
+            "Git repo column",
+            "--repos",
+            str(repo_dir),
+            "--check",
+            "llm-browser-agent/evals.toml",
+            "--score",
+            str(out_csv),
+        ],
+    )
+    rows = list(csv.DictReader(out_csv.open()))
+    assert rows[0]["status"] == "invalid_json"
+    assert rows[1]["status"] == "missing_json"
+    assert rows[2]["status"] == "invalid_repo_url"

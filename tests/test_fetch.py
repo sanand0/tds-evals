@@ -69,3 +69,34 @@ def test_fetch_skips_existing(monkeypatch, tmp_path):
     assert (repos_dir / "c.d.txt").read_text(encoding="utf-8") == "existing"
     assert len(calls) == 1
     assert "Fetching repos" in result.output
+
+
+def test_fetch_logs_on_failure(monkeypatch, tmp_path):
+    csv_path = write_csv(tmp_path)
+    repos_dir = tmp_path / "code"
+    repos_dir.mkdir()
+
+    async def fake_run_cmd(cmd: list[str]):
+        return 1, "out", "err"
+
+    monkeypatch.setattr(fetch, "run_cmd", fake_run_cmd)
+
+    result = runner.invoke(
+        fetch.app,
+        [
+            "--submissions",
+            str(csv_path),
+            "--column",
+            "Git repo column",
+            "--parallel",
+            "5",
+            "--repos",
+            str(repos_dir),
+        ],
+    )
+
+    txt = repos_dir / "a.b.txt"
+    log = repos_dir / "a.b.log"
+    assert result.exit_code == 0
+    assert not txt.exists()
+    assert log.read_text(encoding="utf-8") == "outerr"

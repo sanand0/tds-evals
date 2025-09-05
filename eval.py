@@ -101,34 +101,44 @@ async def eval_one(
     schema: Dict[str, Any],
 ) -> Dict[str, Any] | None:
     repo_txt = txt_path.read_text(encoding="utf-8")
+    log_path = txt_path.with_suffix(".log")
+    err = "no valid response"
     for _ in range(2):
         content = await call_openai_json(
             api_key=api_key, system_prompt=system_prompt, user_content=repo_txt, schema=schema
         )
         if content is None:
+            err = "openai call failed"
             continue
         try:
             data = json.loads(content)
         except Exception:
+            err = "invalid json"
             continue
         valid = True
         for name, info in checks.items():
             obj = data.get(name)
             if not isinstance(obj, dict):
                 valid = False
+                err = "invalid structure"
                 break
             score = obj.get("score")
             max_val = obj.get("max")
             if not isinstance(score, (int, float)) or not isinstance(max_val, (int, float)):
                 valid = False
+                err = "invalid types"
                 break
             if max_val != info["max"] or score > info["max"]:
                 valid = False
+                err = "invalid scores"
                 break
         if valid:
             out = txt_path.with_suffix(".json")
             out.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+            if log_path.exists():
+                log_path.unlink()
             return data
+    log_path.write_text(err, encoding="utf-8")
     return None
 
 

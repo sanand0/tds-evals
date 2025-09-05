@@ -55,9 +55,17 @@ async def run_gitingest(url: str, txt_path: Path) -> bool:
     if txt_path.exists():
         return True
     txt_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path = txt_path.with_suffix(".log")
     cmd = ["uvx", "gitingest", url, "-o", str(txt_path)]
-    rc, _, _ = await run_cmd(cmd)
-    return rc == 0 and txt_path.exists()
+    rc, out, err = await run_cmd(cmd)
+    if rc == 0 and txt_path.exists():
+        if log_path.exists():
+            log_path.unlink()
+        return True
+    log_path.write_text(out + err, encoding="utf-8")
+    if txt_path.exists():
+        txt_path.unlink()
+    return False
 
 
 async def worker(sem: asyncio.Semaphore, url: str, txt_path: Path) -> None:
