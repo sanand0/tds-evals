@@ -1,4 +1,3 @@
-import csv
 import json
 from pathlib import Path
 from importlib.util import module_from_spec, spec_from_file_location
@@ -12,7 +11,7 @@ spec.loader.exec_module(eval_mod)  # type: ignore[arg-type]
 runner = CliRunner()
 
 
-def test_eval_writes_json_and_csv(monkeypatch, tmp_path):
+def test_eval_writes_json(monkeypatch, tmp_path):
     repo_dir = tmp_path / "code"
     repo_dir.mkdir()
     txt_path = repo_dir / "a.b.txt"
@@ -40,7 +39,15 @@ def test_eval_writes_json_and_csv(monkeypatch, tmp_path):
 
     monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
 
-    csv_path = tmp_path / "scores.csv"
+    seen: dict[str, int] = {}
+
+    def fake_tqdm(it, **kwargs):
+        items = list(it)
+        seen["count"] = len(items)
+        return items
+
+    monkeypatch.setattr(eval_mod, "tqdm", fake_tqdm)
+
     result = runner.invoke(
         eval_mod.app,
         [
@@ -48,16 +55,12 @@ def test_eval_writes_json_and_csv(monkeypatch, tmp_path):
             str(repo_dir),
             "--check",
             "llm-browser-agent/evals.toml",
-            "--score",
-            str(csv_path),
         ],
     )
 
     assert result.exit_code == 0
     data = json.loads((repo_dir / "a.b.json").read_text(encoding="utf-8"))
     assert data["agent_loop"]["score"] == 0.1
-    with csv_path.open() as f:
-        rows = list(csv.DictReader(f))
-    assert rows[0]["agent_loop"] == "0.1"
+    assert seen["count"] == 1
     assert len(calls) == 2
     assert "LLM Agent POC" in calls[0]["system_prompt"]

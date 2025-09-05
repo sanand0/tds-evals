@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["typer>=0.12", "httpx>=0.27"]
+# dependencies = ["typer>=0.12", "httpx>=0.27", "tqdm>=4.66"]
 # ///
 
 """Evaluate repo text files using OpenAI and a TOML check config."""
@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import asyncio
-import csv
 import json
 import os
 from pathlib import Path
@@ -18,6 +17,7 @@ from typing import Any, Dict
 import httpx
 import typer
 import tomllib
+from tqdm import tqdm
 
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
@@ -140,35 +140,22 @@ async def eval_all(
 ) -> Dict[str, Dict[str, Any]]:
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     results: Dict[str, Dict[str, Any]] = {}
-    for txt_path in sorted(repos_dir.glob("*.txt")):
+    paths = sorted(repos_dir.glob("*.txt"))
+    for txt_path in tqdm(paths, desc="Evaluating repos", unit="repo"):
         data = await eval_one(txt_path, api_key, system_prompt, checks, schema)
         if data:
             results[txt_path.stem] = data
     return results
 
 
-def write_scores(results: Dict[str, Dict[str, Any]], checks: Dict[str, Dict[str, Any]], out_csv: Path) -> None:
-    fieldnames = ["repo", *checks.keys()]
-    with out_csv.open("w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        for repo, data in results.items():
-            row = {"repo": repo}
-            for name in checks:
-                row[name] = data.get(name, {}).get("score", "")
-            w.writerow(row)
-
-
 @app.command()
 def main(
     repos: Path = typer.Option(Path("./code"), help="Directory with repo .txt files"),
     check: Path = typer.Option(Path("evals.toml"), help="TOML file with instructions and checks"),
-    score: Path = typer.Option(Path("scores.csv"), help="Path to write scores CSV"),
 ) -> None:
     instr, checks = load_config(check)
     system_prompt, schema = build_prompt_and_schema(instr, checks)
-    results = asyncio.run(eval_all(repos, checks, schema, system_prompt))
-    write_scores(results, checks, score)
+    asyncio.run(eval_all(repos, checks, schema, system_prompt))
 
 
 if __name__ == "__main__":
