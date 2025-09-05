@@ -58,7 +58,7 @@ def test_score_writes_status_and_rows(tmp_path):
     assert rows[1]["agent_loop"] == ""
     assert rows[1]["total"] == ""
     assert rows[2]["status"] == "invalid_repo_url"
-    assert rows[2]["repo"] == ""
+    assert rows[2]["repo"] == "invalid"
 
 
 def test_score_handles_invalid_json(tmp_path):
@@ -87,3 +87,4 @@ def test_score_handles_invalid_json(tmp_path):
     assert rows[0]["status"] == "invalid_json"
     assert rows[1]["status"] == "missing_json"
     assert rows[2]["status"] == "invalid_repo_url"
+    assert rows[2]["repo"] == "invalid"

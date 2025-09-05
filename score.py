@@ -46,6 +46,7 @@ def main(
             res = find_first_repo(text)
             if not res:
                 row["status"] = "invalid_repo_url"
+                row["repo"] = text
                 w.writerow(row)
                 continue
             owner, repo = res
