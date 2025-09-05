@@ -37,7 +37,7 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
 GITHUB_REPO_RE = re.compile(
-    r"^https?://(?:www\.)?github\.com/([^/]+)/([^/#?]+?)(?:\.git)?(?:[/#?].*)?$",
+    r"https?://(?:www\.)?github\.com/([^/\s]+)/([^/\s#?]+)(?:\.git)?(?:[/#?]\S*)?",
     re.IGNORECASE,
 )
 
@@ -46,13 +46,20 @@ def is_valid_github_repo_url(url: str) -> Optional[Tuple[str, str]]:
     """Return (owner, repo) if URL is a valid GitHub repo URL; else None."""
     if not url:
         return None
-    m = GITHUB_REPO_RE.match(url.strip())
+    m = GITHUB_REPO_RE.fullmatch(url.strip())
     if not m:
         return None
-    owner, repo = m.group(1), m.group(2)
-    # Guard against repo names ending with '.' after stripping .git
-    repo = repo.rstrip(".")
+    owner, repo = m.group(1), re.sub(r"\.git$", "", m.group(2)).rstrip(".")
     return (owner, repo) if owner and repo else None
+
+
+def extract_first_github_repo_url(text: str) -> Optional[str]:
+    """Return canonical "https://github.com/owner/repo" for first GitHub URL in text."""
+    m = GITHUB_REPO_RE.search(text or "")
+    if not m:
+        return None
+    owner, repo = m.group(1), re.sub(r"\.git$", "", m.group(2)).rstrip(".")
+    return f"https://github.com/{owner}/{repo}"
 
 
 def read_csv_rows(csv_path: Path) -> List[Dict[str, str]]:
@@ -261,12 +268,13 @@ async def process_all(
     """Process all valid repo URLs with up to `parallel` concurrency and tqdm progress."""
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
 
-    # Identify valid URLs tied to row indices
-    url_key = "Browser JS App GitHub Repo URL"
+    # Identify valid URLs from new or legacy column
+    new_key, old_key = "Public GitHub Repository URL", "Browser JS App GitHub Repo URL"
     valids: List[Tuple[int, Dict[str, str], str, str, str]] = []
     for i, row in enumerate(rows):
-        url = (row.get(url_key) or "").strip()
-        parsed = is_valid_github_repo_url(url)
+        text = row.get(new_key) or row.get(old_key) or ""
+        url = extract_first_github_repo_url(text)
+        parsed = is_valid_github_repo_url(url or "")
         if parsed:
             owner, repo = parsed
             valids.append((i, row, url, owner, repo))

@@ -1,9 +1,12 @@
 import csv
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 from typer.testing import CliRunner
 
-import fetch
+spec = spec_from_file_location("fetch", "fetch.py")
+fetch = module_from_spec(spec)
+spec.loader.exec_module(fetch)  # type: ignore[arg-type]
 
 runner = CliRunner()
 
