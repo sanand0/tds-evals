@@ -44,7 +44,7 @@ def is_valid_github_repo_url(url: str) -> Optional[Tuple[str, str]]:
     if not m:
         return None
     owner, repo = m.group(1), m.group(2)
-    repo = repo.rstrip('.')
+    repo = repo.rstrip(".")
     return (owner, repo) if owner and repo else None
 
 
