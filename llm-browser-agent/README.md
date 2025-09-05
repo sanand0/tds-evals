@@ -160,3 +160,25 @@ The literature is clear on two points:
 
 1. Strong LLM judges can approximate human preference judgments at practical levels, enabling scalable first-pass evaluation
 2. reliability is not guaranteed—biases and variance persist, so multi-sample aggregation, explicit evidence, and psychometric checks are non-negotiable. Treat the grader like any rater in an exam system, and you’ll get dependable, fast, and _teachable_ assessments.
+
+## Usage
+
+Run these commands from this directory:
+
+```bash
+uv run ../fetch.py \
+  --submissions submissions.csv \
+  --column "Browser JS App GitHub Repo URL" \
+  --repos ./results/
+
+uv run ../eval.py \
+  --repos ./results/ \
+  --check evals.toml
+
+uv run ../score.py \
+  --submissions submissions.csv \
+  --column "Browser JS App GitHub Repo URL" \
+  --repos ./results/ \
+  --check evals.toml \
+  --score public-scores.csv
+```
