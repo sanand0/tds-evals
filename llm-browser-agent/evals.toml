@@ -1,3 +1,4 @@
+instructions = """
 You are a meticulous code reviewer. Evaluate the student's submission for the assignment:
 
 LLM Agent POC — Browser-Based Multi-Tool Reasoning
@@ -24,12 +25,6 @@ Grading (total 2.0 marks):
 - Output functionality: 1.0
 - Code quality & clarity: 0.5
 - UI/UX polish & extras: 0.5
-
----------------------------
-INPUT (student submission)
----------------------------
-{{STUDENT_CODE}}
----------------------------
 
 YOUR TASK
 1) Do static analysis only. Do NOT assume behavior that is not explicitly present in code. If the requirement is not clearly implemented, mark it as “not found”.
@@ -106,3 +101,101 @@ VERDICT RULE OF THUMB
 - revise: < 1.2 or multiple critical misses
 
 Remember: Output ONLY valid JSON. No commentary.
+"""
+
+[checks.agent_loop]
+max = 0.20
+check = """
+Agent loop & integration: look for a message array/log, repeated LLM calls, conditional execution of tool calls until no more, then user input appended; streaming print/update.
+"""
+
+[checks.openai_tool_calls]
+max = 0.20
+check = """
+OpenAI tool/function calling: presence of messages array, tools schema, tool_calls with {type:"function", function:{name, arguments}} or equivalent; handling of tool results back to the model.
+"""
+
+[checks.google_search_tool]
+max = 0.15
+check = """
+Google Search API: function or module clearly calling a search endpoint; look for "customsearch" or a named "search" tool returning snippets.
+"""
+
+[checks.aipipe_tool]
+max = 0.15
+check = """
+AI Pipe proxy: code referencing "aipipe" or calling an endpoint documented for the aipipe proxy.
+"""
+
+[checks.js_exec_sandboxed]
+max = 0.20
+check = """
+JS code execution (sandboxed): usage of <iframe sandbox>, Web Worker, or other isolation. Using eval/Function in the main window without isolation is NOT sandboxed.
+"""
+
+[checks.streaming_or_updates]
+max = 0.10
+check = """
+Streams/prints model output incrementally or clearly updates conversation window.
+"""
+
+[checks.simplicity]
+max = 0.15
+check = """
+Simplicity/minimal deps; small, hackable codebase.
+"""
+
+[checks.readability]
+max = 0.10
+check = """
+Readability (names, small functions, comments where needed).
+"""
+
+[checks.separation_of_concerns]
+max = 0.10
+check = """
+Separation of concerns (UI vs agent vs tools).
+"""
+
+[checks.error_handling]
+max = 0.10
+check = """
+Robust error handling paths (try/catch, user-visible messages).
+"""
+
+[checks.security_hygiene]
+max = 0.05
+check = """
+Security hygiene: sandbox for code exec; input sanitation for tool arguments; no exposed secrets; CORS/Origin considerations.
+"""
+
+[checks.model_picker_bootstrap_llm_provider]
+max = 0.15
+check = """
+Model picker via bootstrap-llm-provider.
+"""
+
+[checks.bootstrap_alert_errors]
+max = 0.10
+check = """
+Error UI via bootstrap-alert.
+"""
+
+[checks.conversation_ui_clarity]
+max = 0.10
+check = """
+Clear conversation window & simple controls (send, run tool, etc.).
+"""
+
+[checks.useful_affordances]
+max = 0.10
+check = """
+Small, discoverable UI affordances (copy to clipboard, status badges, keyboard submit, loading indicator).
+"""
+
+[checks.extras_without_bloat]
+max = 0.05
+check = """
+Any tasteful extra that improves hackability without bloat.
+"""
+
