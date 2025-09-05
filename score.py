@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["typer>=0.12"]
+# dependencies = ["typer>=0.12", "tqdm>=4.66"]
 # ///
 """Aggregate evaluation JSON files into a CSV."""
 

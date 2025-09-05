@@ -26,12 +26,6 @@ Grading (total 2.0 marks):
 - Code quality & clarity: 0.5
 - UI/UX polish & extras: 0.5
 
----------------------------
-INPUT (student submission)
----------------------------
-{{STUDENT_CODE}}
----------------------------
-
 YOUR TASK
 1) Do static analysis only. Do NOT assume behavior that is not explicitly present in code. If the requirement is not clearly implemented, mark it as “not found”.
 2) Check for concrete signals (imports, function names, HTML elements, JSON shapes, fetch targets, tool schemas, sandbox usage, etc.). Quote tiny code excerpts (<=120 chars each) as evidence when relevant.
