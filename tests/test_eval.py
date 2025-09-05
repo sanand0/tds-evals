@@ -1,5 +1,6 @@
 import csv
 import json
+from pathlib import Path
 from importlib.util import module_from_spec, spec_from_file_location
 
 from typer.testing import CliRunner
@@ -16,24 +17,26 @@ def test_eval_writes_json_and_csv(monkeypatch, tmp_path):
     repo_dir.mkdir()
     txt_path = repo_dir / "a.b.txt"
     txt_path.write_text("repo", encoding="utf-8")
+    instr, checks = eval_mod.load_config(Path("llm-browser-agent/evals.toml"))
 
     calls: list[dict[str, str]] = []
 
+    invalid_scores = {name: 0.0 for name in checks}
+    invalid_scores["agent_loop"] = checks["agent_loop"]["max"] * 2
+
+    valid_scores = {name: 0.0 for name in checks}
+    valid_scores["agent_loop"] = 0.1
+
+    def build(scores: dict[str, float]) -> str:
+        data = {
+            name: {"score": scores[name], "max": info["max"], "reason": ""}
+            for name, info in checks.items()
+        }
+        return json.dumps(data)
+
     async def fake_call(**kwargs):
         calls.append(kwargs)
-        if len(calls) == 1:
-            return json.dumps(
-                {
-                    "agent_loop": {"score": 1.0, "max": 0.2, "reason": ""},
-                    "openai_tool_calls": {"score": 0.1, "max": 0.2, "reason": ""},
-                }
-            )
-        return json.dumps(
-            {
-                "agent_loop": {"score": 0.1, "max": 0.2, "reason": ""},
-                "openai_tool_calls": {"score": 0.1, "max": 0.2, "reason": ""},
-            }
-        )
+        return build(invalid_scores if len(calls) == 1 else valid_scores)
 
     monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
 
