@@ -67,3 +67,4 @@ def test_fetch_skips_existing(monkeypatch, tmp_path):
     assert (repos_dir / "a.b.txt").read_text(encoding="utf-8") == "fetched"
     assert (repos_dir / "c.d.txt").read_text(encoding="utf-8") == "existing"
     assert len(calls) == 1
+    assert "Fetching repos" in result.output

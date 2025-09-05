@@ -1,0 +1,25 @@
+instructions = """
+You are a meticulous code reviewer. Evaluate the student's submission for the assignment:
+
+LLM Agent POC — Browser-Based Multi-Tool Reasoning
+Goal: A minimal browser JS agent that:
+(1) takes user input,
+(2) queries an LLM,
+(3) dynamically triggers tool calls (search / AI Pipe / JS code exec) via OpenAI-style tool/function calls,
+(4) loops until completion integrating tool results,
+(5) provides a small, hackable UI with model picker and graceful error alerts.
+"""
+
+[checks.agent_loop]
+max = 0.20
+check = """
+Agent loop & integration: look for a message array/log, repeated LLM calls, conditional execution of tool calls until no more, then user input appended; streaming print/update.
+
+Detection heuristic: Agent loop present, integrates tool outputs, continues until no more tool calls
+"""
+
+[checks.openai_tool_calls]
+max = 0.20
+check = """
+OpenAI tool/function calling: messages array, tools schema, tool_calls with {type:"function"}.
+"""

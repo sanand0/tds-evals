@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["typer>=0.12"]
+# dependencies = ["typer>=0.12", "tqdm>=4.66"]
 # ///
 
 """Fetch GitHub repos listed in a CSV via gitingest."""
@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 import typer
+from tqdm import tqdm
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -84,9 +85,13 @@ async def fetch_all(
         if txt_path.exists():
             continue
         url = f"https://github.com/{owner}/{repo}"
-        tasks.append(worker(sem, url, txt_path))
+        tasks.append(asyncio.create_task(worker(sem, url, txt_path)))
     if tasks:
-        await asyncio.gather(*tasks)
+        pbar = tqdm(total=len(tasks), desc="Fetching repos", unit="repo")
+        for coro in asyncio.as_completed(tasks):
+            await coro
+            pbar.update(1)
+        pbar.close()
 
 
 @app.command()
