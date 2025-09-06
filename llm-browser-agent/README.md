@@ -52,8 +52,7 @@ SKIP TESTS!
 ```
 
 It generated [process_submissions.py](process_submissions.py) which we made minor enhancements to.
-
-We then added a [summary_csv.py](summary_csv.py) that summarizes the results.
+Summaries are now produced via `score.py` which aggregates individual JSON evaluations into a CSV.
 
 ## Step 3: Run the evaluation
 
@@ -166,6 +165,7 @@ The literature is clear on two points:
 Run these commands from this directory:
 
 ```bash
+export OPENAI_API_KEY=your_key
 uv run ../fetch.py \
   --submissions submissions.csv \
   --column "Browser JS App GitHub Repo URL" \
@@ -181,4 +181,12 @@ uv run ../score.py \
   --repos ./results/ \
   --check evals.toml \
   --score scores.csv
+```
+
+## Test
+
+Run project tests from repo root:
+
+```bash
+uv run -m pytest -q
 ```

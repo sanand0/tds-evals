@@ -62,6 +62,7 @@ The result was re-crafted into this [evals.toml](evals.toml)
 Run these commands from this directory:
 
 ```bash
+export OPENAI_API_KEY=your_key
 uv run ../fetch.py \
   --submissions submissions.csv \
   --column "Public GitHub Repository URL" \
@@ -77,4 +78,12 @@ uv run ../score.py \
   --repos ./results/ \
   --check evals.toml \
   --score scores.csv
+```
+
+## Test
+
+Run project tests from repo root:
+
+```bash
+uv run -m pytest -q
 ```

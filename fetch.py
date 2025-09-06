@@ -12,6 +12,7 @@ import asyncio
 import csv
 import re
 from pathlib import Path
+from datetime import datetime, timezone
 
 import typer
 from tqdm import tqdm
@@ -52,17 +53,37 @@ async def run_cmd(cmd: list[str]) -> tuple[int, str, str]:
 
 async def run_gitingest(url: str, txt_path: Path) -> bool:
     """Run gitingest if txt_path missing."""
-    if txt_path.exists():
+    if txt_path.exists() and txt_path.stat().st_size > 0:
         return True
     txt_path.parent.mkdir(parents=True, exist_ok=True)
     log_path = txt_path.with_suffix(".log")
     cmd = ["uvx", "gitingest", url, "-o", str(txt_path)]
     rc, out, err = await run_cmd(cmd)
-    if rc == 0 and txt_path.exists():
+    if rc == 0 and txt_path.exists() and txt_path.stat().st_size > 0:
         if log_path.exists():
             log_path.unlink()
         return True
-    log_path.write_text(out + err, encoding="utf-8")
+    ts = datetime.now(timezone.utc).isoformat()
+    size = txt_path.stat().st_size if txt_path.exists() else 0
+    reason = "ok"
+    if rc != 0:
+        reason = f"nonzero return code {rc}"
+    elif size == 0:
+        reason = "empty output (0 bytes)"
+    error_log = f"""gitingest failure
+cmd: {" ".join(cmd)}
+result: {rc}
+size: {size}
+time: {ts}
+reason: {reason}
+
+stdout:
+{out}
+
+stderr:
+{err}
+"""
+    log_path.write_text(error_log, encoding="utf-8")
     if txt_path.exists():
         txt_path.unlink()
     return False
@@ -90,7 +111,7 @@ async def fetch_all(
             continue
         seen.add(base)
         txt_path = repos_dir / f"{base}.txt"
-        if txt_path.exists():
+        if txt_path.exists() and txt_path.stat().st_size > 0:
             continue
         url = f"https://github.com/{owner}/{repo}"
         tasks.append(asyncio.create_task(worker(sem, url, txt_path)))

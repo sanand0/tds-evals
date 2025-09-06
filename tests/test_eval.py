@@ -48,6 +48,7 @@ def test_eval_writes_json(monkeypatch, tmp_path):
 
     monkeypatch.setattr(eval_mod, "tqdm", fake_tqdm)
 
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     result = runner.invoke(
         eval_mod.app,
         [
@@ -83,6 +84,7 @@ def test_eval_skips_existing_json(monkeypatch, tmp_path):
 
     monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
 
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     runner.invoke(
         eval_mod.app,
         ["--repos", str(repo_dir), "--check", "llm-browser-agent/evals.toml"],
@@ -103,6 +105,7 @@ def test_eval_logs_on_openai_failure(monkeypatch, tmp_path):
 
     monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
 
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     runner.invoke(
         eval_mod.app,
         ["--repos", str(repo_dir), "--check", "llm-browser-agent/evals.toml"],
@@ -134,6 +137,7 @@ def test_model_option_is_passed_to_openai(monkeypatch, tmp_path):
     monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
 
     custom_model = "gpt-4o-mini"
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     result = runner.invoke(
         eval_mod.app,
         [
@@ -168,6 +172,7 @@ def test_model_option_defaults_when_omitted(monkeypatch, tmp_path):
 
     monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
 
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     result = runner.invoke(
         eval_mod.app,
         ["--repos", str(repo_dir), "--check", "llm-browser-agent/evals.toml"],
@@ -175,3 +180,159 @@ def test_model_option_defaults_when_omitted(monkeypatch, tmp_path):
 
     assert result.exit_code == 0
     assert seen_model == ["gpt-5-mini"]
+
+
+def test_call_openai_json_handles_non_200(monkeypatch):
+    class FakeResp:
+        status_code = 429
+
+        def json(self):  # pragma: no cover - not called on non-200
+            return {}
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, *a, **k):
+            return FakeResp()
+
+    monkeypatch.setattr(eval_mod.httpx, "AsyncClient", FakeClient)
+
+    import asyncio
+
+    instr, checks = eval_mod.load_config(Path("llm-browser-agent/evals.toml"))
+    _system_prompt, schema = eval_mod.build_prompt_and_schema(instr, checks)
+    res = asyncio.run(
+        eval_mod.call_openai_json(
+            api_key="k",
+            model="gpt-5-mini",
+            system_prompt="sys",
+            user_content="u",
+            schema=schema,
+            timeout_s=1.0,
+        )
+    )
+    assert res is None
+
+
+def test_call_openai_json_success(monkeypatch):
+    class FakeResp:
+        status_code = 200
+
+        def json(self):
+            return {"choices": [{"message": {"content": "{}"}}]}
+
+    class FakeClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, *a, **k):
+            return FakeResp()
+
+    monkeypatch.setattr(eval_mod.httpx, "AsyncClient", FakeClient)
+
+    import asyncio
+
+    instr, checks = eval_mod.load_config(Path("llm-browser-agent/evals.toml"))
+    _system_prompt, schema = eval_mod.build_prompt_and_schema(instr, checks)
+    res = asyncio.run(
+        eval_mod.call_openai_json(
+            api_key="k",
+            model="gpt-5-mini",
+            system_prompt="sys",
+            user_content="u",
+            schema=schema,
+            timeout_s=1.0,
+        )
+    )
+    assert res == "{}"
+
+
+def test_eval_one_invalid_cases_then_valid(monkeypatch, tmp_path):
+    repo_dir = tmp_path
+    txt_path = repo_dir / "a.b.txt"
+    txt_path.write_text("repo", encoding="utf-8")
+    instr, checks = eval_mod.load_config(Path("llm-browser-agent/evals.toml"))
+    system_prompt, schema = eval_mod.build_prompt_and_schema(instr, checks)
+
+    # Build various invalid payloads
+    def payload_with(overrides: dict[str, dict]):
+        data = {
+            name: {"score": 0.0, "max": info["max"], "reason": "ok"}
+            for name, info in checks.items()
+        }
+        for k, v in overrides.items():
+            data[k] = v
+        return json.dumps(data)
+
+    invalids = [
+        "not json",
+        payload_with({"agent_loop": 123}),  # invalid structure
+        payload_with({"agent_loop": {"score": "x", "max": 0.2, "reason": "ok"}}),  # invalid types
+        payload_with({"agent_loop": {"score": -0.1, "max": 0.2, "reason": "ok"}}),  # negative score
+    ]
+
+    import asyncio
+
+    for bad in invalids:
+        calls = {"i": 0}
+
+        async def fake_call(**kwargs):
+            i = calls["i"]
+            calls["i"] += 1
+            return bad if i == 0 else payload_with({})
+
+        monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
+
+        out = asyncio.run(
+            eval_mod.eval_one(
+                txt_path,
+                api_key="k",
+                model="m",
+                system_prompt=system_prompt,
+                checks=checks,
+                schema=schema,
+            )
+        )
+        assert out is not None
+        # log should not persist after success
+        assert not txt_path.with_suffix(".log").exists()
+
+
+def test_eval_clears_previous_log_on_success(monkeypatch, tmp_path):
+    repo_dir = tmp_path / "code"
+    repo_dir.mkdir()
+    txt_path = repo_dir / "a.b.txt"
+    txt_path.write_text("repo", encoding="utf-8")
+    # pre-existing log
+    (repo_dir / "a.b.log").write_text("old error", encoding="utf-8")
+
+    async def fake_call(**kwargs):
+        instr, checks = eval_mod.load_config(Path("llm-browser-agent/evals.toml"))
+        _sp, _schema = eval_mod.build_prompt_and_schema(instr, checks)
+        data = {
+            name: {"score": 0.0, "max": info["max"], "reason": ""} for name, info in checks.items()
+        }
+        return json.dumps(data)
+
+    monkeypatch.setattr(eval_mod, "call_openai_json", fake_call)
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    runner.invoke(
+        eval_mod.app,
+        ["--repos", str(repo_dir), "--check", "llm-browser-agent/evals.toml"],
+    )
+    assert (repo_dir / "a.b.json").exists()
+    assert not (repo_dir / "a.b.log").exists()

@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 import httpx
@@ -24,7 +25,8 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
 def load_config(path: Path) -> tuple[str, Dict[str, Dict[str, Any]]]:
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    with path.open("rb") as f:
+        data = tomllib.load(f)
     instructions: str = data.get("instructions", "")
     checks: Dict[str, Dict[str, Any]] = data.get("checks", {})
     return instructions, checks
@@ -109,8 +111,9 @@ async def eval_one(
 ) -> Dict[str, Any] | None:
     repo_txt = txt_path.read_text(encoding="utf-8")
     log_path = txt_path.with_suffix(".log")
-    err = "no valid response"
+    errors: list[str] = []
     for _ in range(2):
+        attempt = len(errors) + 1
         content = await call_openai_json(
             api_key=api_key,
             model=model,
@@ -119,31 +122,41 @@ async def eval_one(
             schema=schema,
         )
         if content is None:
-            err = "openai call failed"
+            errors.append(f"attempt {attempt}: openai call failed")
             continue
         try:
             data = json.loads(content)
         except Exception:
-            err = "invalid json"
+            snippet = content[:500] if isinstance(content, str) else str(type(content))
+            errors.append(f"attempt {attempt}: invalid json: {snippet}")
             continue
-        valid = True
+        start_errors = len(errors)
         for name, info in checks.items():
             obj = data.get(name)
             if not isinstance(obj, dict):
-                valid = False
-                err = "invalid structure"
+                errors.append(
+                    f"attempt {attempt}: check {name}: invalid structure: {type(obj).__name__}"
+                )
                 break
             score = obj.get("score")
             max_val = obj.get("max")
+            reason = obj.get("reason")
             if not isinstance(score, (int, float)) or not isinstance(max_val, (int, float)):
-                valid = False
-                err = "invalid types"
+                errors.append(
+                    f"attempt {attempt}: check {name}: invalid types: score={type(score).__name__}, max={type(max_val).__name__}"
+                )
                 break
-            if max_val != info["max"] or score > info["max"]:
-                valid = False
-                err = "invalid scores"
+            if not isinstance(reason, str):
+                errors.append(
+                    f"attempt {attempt}: check {name}: invalid reason type: {type(reason).__name__}"
+                )
                 break
-        if valid:
+            if max_val != info["max"] or score > info["max"] or score < 0:
+                errors.append(
+                    f"attempt {attempt}: check {name}: invalid scores: score={score}, max={max_val}, expected_max={info['max']}"
+                )
+                break
+        if len(errors) == start_errors:
             out = txt_path.with_suffix(".json")
             out.write_text(
                 json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8"
@@ -151,7 +164,16 @@ async def eval_one(
             if log_path.exists():
                 log_path.unlink()
             return data
-    log_path.write_text(err, encoding="utf-8")
+    timestamp = datetime.now(timezone.utc).isoformat()
+    error_log = f"""eval failure
+file: {txt_path.name}
+model: {model}
+attempts: {len(errors)}
+time: {timestamp}
+
+{"\n".join(errors)}
+"""
+    log_path.write_text(error_log, encoding="utf-8")
     return None
 
 
@@ -162,7 +184,7 @@ async def eval_all(
     model: str,
     system_prompt: str,
 ) -> Dict[str, Dict[str, Any]]:
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    api_key = os.environ["OPENAI_API_KEY"].strip()
     results: Dict[str, Dict[str, Any]] = {}
     paths = sorted(repos_dir.glob("*.txt"))
     for txt_path in tqdm(paths, desc="Evaluating repos", unit="repo"):

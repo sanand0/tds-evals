@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
-# dependencies = ["typer>=0.12", "tqdm>=4.66"]
+# dependencies = ["typer>=0.12"]
 # ///
 """Aggregate evaluation JSON files into a CSV."""
 
@@ -21,7 +21,8 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
 def load_checks(path: Path) -> List[str]:
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
+    with path.open("rb") as f:
+        data = tomllib.load(f)
     checks = data.get("checks", {})
     return list(checks.keys())
 
@@ -57,7 +58,8 @@ def main(
                 w.writerow(row)
                 continue
             try:
-                data = json.loads(json_path.read_text(encoding="utf-8"))
+                with json_path.open("r", encoding="utf-8") as jf:
+                    data = json.load(jf)
             except Exception:
                 row["status"] = "invalid_json"
                 w.writerow(row)
